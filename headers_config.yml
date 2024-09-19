@@ -1,0 +1,48 @@
+# Security Headers
+headers:
+  - name: Strict-Transport-Security
+    condition: "present"  # Must be present to pass
+  - name: X-Frame-Options
+    condition: "present"
+  - name: X-Content-Type-Options
+    condition: "present"
+  - name: Referrer-Policy
+    condition: "present"
+  - name: Content-Security-Policy
+    condition: "present"
+  - name: X-Permitted-Cross-Domain-Policies
+    condition: "present"
+  - name: Clear-Site-Data
+    condition: "present"
+  - name: Permissions-Policy
+    condition: "present"
+  - name: Cache-Control
+    condition: "present"
+
+# Headers That Should Be Removed
+unwanted_headers:
+  - name: Server
+    condition: "not_present"  # Must not be present to pass
+  - name: X-Powered-By
+    condition: "not_present"  # Should be absent to pass
+  - name: X-AspNet-Version
+    condition: "not_present"
+  - name: X-AspNetMvc-Version
+    condition: "not_present"
+  - name: Feature-Policy
+    condition: "not_present"
+  - name: Public-Key-Pins
+    condition: "not_present"
+  - name: Expect-CT
+    condition: "not_present"
+  - name: X-XSS-Protection
+    condition: "not_present"
+
+# Upcoming Headers
+upcoming_headers:
+  - name: Cross-Origin-Embedder-Policy
+    condition: "present"
+  - name: Cross-Origin-Opener-Policy
+    condition: "present"
+  - name: Cross-Origin-Resource-Policy
+    condition: "present"
