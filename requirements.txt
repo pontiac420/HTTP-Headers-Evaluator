@@ -1,0 +1,8 @@
+aiohttp
+argparse
+beautifulsoup4
+colorama
+pyyaml
+requests
+tabulate
+tqdm
