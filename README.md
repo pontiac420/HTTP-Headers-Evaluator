@@ -1,157 +1,93 @@
 ---
 
-# Security Headers Checker
+# Security Headers Evaluation Tool
 
-This Python script checks for the presence of security headers on a given website and provides a grade based on the headers' configuration. It uses the [securityheaders.com](https://securityheaders.com/) API to fetch and analyze the headers, and applies a scoring system to determine the security rating of the website.
+This Python script evaluates the HTTP security headers of websites, checks for unwanted headers, and calculates a security score. It supports single URL checks and bulk processing of multiple URLs, saving the results to a CSV file.
 
 ## Features
 
-- **Check Security Headers**: Evaluate common security headers like `Strict-Transport-Security`, `X-Frame-Options`, `Content-Security-Policy`, and more.
-- **Warnings Detection**: Detect warnings (e.g., unsafe configurations) in the headers.
-- **Upcoming Headers**: Display upcoming headers without affecting the grade.
-- **Scoring and Grading**: Score the site based on the number of passes and fails.
-- **Interactive Mode**: If no URL is provided as a command-line argument, the script will prompt for input interactively.
-- **Command-Line Usage**: Can be run with a target site URL passed as a command-line argument.
+- **Security Headers Check**: Verifies the presence of essential security headers such as `Strict-Transport-Security`, `X-Frame-Options`, and more.
+- **Unwanted Headers Check**: Ensures headers like `Server`, `X-Powered-By`, and others that should not be exposed are absent.
+- **Warning Detection**: Fetches warnings from [securityheaders.com](https://securityheaders.com) and includes them in the evaluation.
+- **Grading System**: Grades the website based on the security headers' presence, warnings, and the number of unwanted headers.
+- **Bulk Processing**: Accepts a list of URLs in a text file and processes them all, saving the results to a CSV file.
 
 ## Installation
 
-1. Clone the repository:
+1. Clone the repository or download the script files.
+2. Install the required Python packages by running:
 
-    ```bash
-    git clone https://github.com/your-username/security-headers-checker.git
-    cd security-headers-checker
-    ```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-2. Install the required dependencies:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3. Ensure you have the following in your `requirements.txt`:
-
-    ```
-    requests
-    PyYAML
-    beautifulsoup4
-    ```
+3. The script uses a configuration file (`headers_config.yml`) to define the headers and conditions for passing or failing. Ensure this file is in the same directory as the script.
 
 ## Usage
 
-You can run the script in two ways: by passing the target URL as a command-line argument or entering interactive mode.
+### Single URL Evaluation
 
-### Command-Line Argument Mode
-
-```bash
-python check_headers.py https://example.com
-```
-
-This will check the security headers of `https://example.com` and display the results along with the final score and grade.
-
-### Interactive Mode
-
-If you don’t provide the URL as a command-line argument, the script will prompt you for one:
+To check the security headers of a single website, use the `--target_site` argument followed by the website's URL:
 
 ```bash
-python check_headers.py
+python3 evaluate_headers.py --target_site https://example.com
 ```
 
-The script will then ask you to enter a URL:
+### Bulk URL Processing
 
+To evaluate multiple URLs, provide a text file containing the URLs (one URL per line) with the `--bulk` argument. Use the `--output_csv` argument to specify the CSV output file:
+
+```bash
+python3 evaluate_headers.py --bulk urls.txt --output_csv results.csv
 ```
-Enter the target site URL (e.g., https://example.com): example.com  
+
+Where `urls.txt` contains:
 ```
+https://example1.com
+https://example2.com
+https://example3.com
+```
+
+This will process each URL and save the results to `results.csv`.
 
 ### Example Output
 
-```
-Security Headers:
+For each website, the script will output:
+
+- **Score and Grade**: Based on the presence or absence of security headers and unwanted headers.
+- **Security Headers**: `PASS`, `FAIL`, or `WARNING` (with the warning message).
+- **Unwanted Headers**: Check whether unwanted headers like `Server` and `X-Powered-By` are exposed.
+
+Sample output:
+
+```bash
+Security Headers (Fail if not present):
 Strict-Transport-Security: PASS
 X-Frame-Options: PASS
 X-Content-Type-Options: PASS
 Referrer-Policy: PASS
-Content-Security-Policy: WARNING (Contains 'unsafe-inline')
+Content-Security-Policy: WARNING (This policy contains 'unsafe-inline' which is dangerous in the script-src directive.)
 X-Permitted-Cross-Domain-Policies: FAIL
 Clear-Site-Data: FAIL
 Permissions-Policy: PASS
 Cache-Control: PASS
 
-Headers That Should Be Removed:
+Headers That Should Be Removed (Fail if present):
 Server: FAIL (present)
 X-Powered-By: PASS (not present)
-X-AspNet-Version: PASS (not present)
-X-AspNetMvc-Version: PASS (not present)
-Feature-Policy: PASS (not present)
-Public-Key-Pins: PASS (not present)
-Expect-CT: PASS (not present)
-X-XSS-Protection: PASS (not present)
 
 Upcoming Headers:
 Cross-Origin-Embedder-Policy: PASS (Upcoming header)
 Cross-Origin-Opener-Policy: PASS (Upcoming header)
 Cross-Origin-Resource-Policy: PASS (Upcoming header)
 
-Final Score: 23.53
-Grade: C
+Final Score: 52.94
+Grade: B
 ```
 
-### Grading System
+### Configuration
 
-The grading system is based on the following formula:
-
-```
-Score = (100 / 17) * (Total Passes - Total Fails)
-```
-
-The grade is assigned based on the final score:
-```
-    if -100 <= score <= -88.89:
-        grade = "F-"
-    elif -88.89 < score <= -77.78:
-        grade = "F"
-    elif -77.78 < score <= -66.67:
-        grade = "F+"
-    elif -66.67 < score <= -55.56:
-        grade = "E-"
-    elif -55.56 < score <= -44.45:
-        grade = "E"
-    elif -44.45 < score <= -33.34:
-        grade = "E+"
-    elif -33.34 < score <= -22.23:
-        grade = "D-"
-    elif -22.23 < score <= -11.12:
-        grade = "D"
-    elif -11.12 < score <= -0.01:
-        grade = "D+"
-    elif 0 < score <= 11.11:
-        grade = "-C"
-    elif 11.11 < score <= 22.22:
-        grade = "C"
-    elif 22.22 < score <= 33.33:
-        grade = "C+"
-    elif 33.33 < score <= 44.44:
-        grade = "B-"
-    elif 44.44 < score <= 55.55:
-        grade = "B"
-    elif 55.55 < score <= 66.66:
-        grade = "B+"
-    elif 66.66 < score <= 77.77:
-        grade = "A-"
-    elif 77.77 < score <= 88.88:
-        grade = "A"
-    elif 88.88 < score <= 100:
-        grade = "A+"
-```
-
-## Configuration
-
-The headers to be tested are stored in a YAML configuration file `headers_config.yml`. It contains three sections:
-
-1. **Security Headers**: Headers that should be present for security purposes.
-2. **Unwanted Headers**: Headers that should be removed for security reasons.
-3. **Upcoming Headers**: Headers that will be displayed but not evaluated in the grading process.
-
-### Example `headers_config.yml`
+The `headers_config.yml` file contains the configuration for the security and unwanted headers:
 
 ```yaml
 # Security Headers
@@ -160,53 +96,50 @@ headers:
     condition: "present"
   - name: X-Frame-Options
     condition: "present"
-  - name: X-Content-Type-Options
-    condition: "present"
-  - name: Referrer-Policy
-    condition: "present"
-  - name: Content-Security-Policy
-    condition: "present"
-  - name: X-Permitted-Cross-Domain-Policies
-    condition: "present"
-  - name: Clear-Site-Data
-    condition: "present"
-  - name: Permissions-Policy
-    condition: "present"
-  - name: Cache-Control
-    condition: "present"
+  # Add more headers as needed...
 
-# Headers That Should Be Removed
+# Unwanted Headers
 unwanted_headers:
   - name: Server
     condition: "not_present"
   - name: X-Powered-By
     condition: "not_present"
-  - name: X-AspNet-Version
-    condition: "not_present"
-  - name: X-AspNetMvc-Version
-    condition: "not_present"
-  - name: Feature-Policy
-    condition: "not_present"
-  - name: Public-Key-Pins
-    condition: "not_present"
-  - name: Expect-CT
-    condition: "not_present"
-  - name: X-XSS-Protection
-    condition: "not_present"
+  # Add more headers as needed...
 
-# Upcoming Headers
+# Upcoming Headers (Not considered in grading)
 upcoming_headers:
   - name: Cross-Origin-Embedder-Policy
   - name: Cross-Origin-Opener-Policy
   - name: Cross-Origin-Resource-Policy
 ```
 
-## License
+### Grading
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The grading system is based on the following:
 
-## Contributions
+- Each header `PASS`: +5.88 points (for a total of 17 headers)
+- Each header `FAIL` or `WARNING`: Subtracted from the score
 
-Contributions are welcome! Please feel free to open an issue or submit a pull request for any bugs or enhancements.
+The grade ranges are:
+
+| Score Range   | Grade |
+| ------------- | ----- |
+| 88.88 - 100   | A+    |
+| 77.77 - 88.87 | A     |
+| 66.66 - 77.76 | A-    |
+| 55.55 - 66.65 | B+    |
+| 44.44 - 55.54 | B     |
+| 33.33 - 44.43 | B-    |
+| 22.22 - 33.32 | C+    |
+| 11.11 - 22.21 | C     |
+|  0.00 - 11.10 | C-    |
+| -0.01 - -11.11| D+    |
+| -11.12 - -22.22| D    |
+| ... | F    |
+
+### License
+
+This project is licensed under the MIT License.
 
 ---
+
