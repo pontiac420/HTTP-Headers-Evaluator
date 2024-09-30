@@ -15,6 +15,9 @@ from tqdm import tqdm
 import os
 import textwrap
 import datetime  # Added to handle timestamps
+import ssl
+from requests.exceptions import RequestException
+from urllib.parse import urlparse
 
 # Initialize colorama for cross-platform color support
 init(autoreset=True)
@@ -81,15 +84,18 @@ def store_results_in_db(url, score, grade, results_list):
         # Capture the current timestamp
         current_timestamp = datetime.datetime.now().isoformat()
 
-        # Delete existing entries for the URL to keep only the latest results
-        cursor.execute('DELETE FROM results WHERE url = ?', (url,))
-        logging.info(f"Deleted previous entries for {url} from the database.")
+        # Calculate the timestamp for 90 days ago
+        ninety_days_ago = (datetime.datetime.now() - datetime.timedelta(days=90)).isoformat()
+
+        # Delete entries older than 90 days for the URL
+        cursor.execute('DELETE FROM results WHERE url = ? AND timestamp < ?', (url, ninety_days_ago))
+        logging.info(f"Deleted entries older than 90 days for {url} from the database.")
 
         # Insert new results
         for result in results_list:
             cursor.execute('''INSERT INTO results (url, score, grade, header_name, status, header_value, timestamp) 
                               VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                           (url, score, grade, result[0], result[1], result[2], current_timestamp))  # Included timestamp
+                           (url, score, grade, result[0], result[1], result[2], current_timestamp))
 
         conn.commit()
         conn.close()
@@ -115,9 +121,11 @@ def load_config(config_path):
         sys.exit(1)
 
 # Function to get the headers of a website (synchronous)
-def fetch_headers_report_sync(target_site):
+def fetch_headers_report_sync(target_site, ssl_context=None):
     try:
-        response = requests.head(target_site, allow_redirects=True, timeout=10)
+        with requests.Session() as session:
+            session.verify = False
+            response = session.head(target_site, allow_redirects=True, timeout=10)
         logging.info(f"Fetched headers for {target_site}.")
         return response.headers
     except requests.exceptions.RequestException as e:
@@ -125,9 +133,9 @@ def fetch_headers_report_sync(target_site):
         return None
 
 # Async function to get the headers of a website
-async def fetch_headers_report_async(session, target_site):
+async def fetch_headers_report_async(session, target_site, ssl_context=None):
     try:
-        async with session.head(target_site, allow_redirects=True, timeout=10) as response:
+        async with session.head(target_site, allow_redirects=True, timeout=10, ssl=False) as response:
             headers = response.headers
             logging.info(f"Fetched headers for {target_site}.")
             return headers
@@ -303,12 +311,12 @@ def calculate_final_grade(total_passes, total_fails):
     return score, grade
 
 # Function to process a single URL (synchronous)
-def process_single_url(target_site, config, show_full_headers=False):
+def process_single_url(target_site, config, show_full_headers=False, ssl_context=None):
     total_passes = 0
     total_fails = 0
 
     # Fetch headers for the provided target site
-    response_headers = fetch_headers_report_sync(target_site)
+    response_headers = fetch_headers_report_sync(target_site, ssl_context=ssl_context)
     if not response_headers:
         logging.error(f"Skipping {target_site} due to failed header fetch.")
         return None, None, []
@@ -345,12 +353,12 @@ def process_single_url(target_site, config, show_full_headers=False):
     return score, grade, security_results + unwanted_results + upcoming_results
 
 # Async function to process a single URL
-async def process_single_url_async(session, target_site, config, show_full_headers=False):
+async def process_single_url_async(session, target_site, config, show_full_headers=False, ssl_context=None):
     total_passes = 0
     total_fails = 0
 
     # Fetch headers
-    response_headers = await fetch_headers_report_async(session, target_site)
+    response_headers = await fetch_headers_report_async(session, target_site, ssl_context=ssl_context)
     if not response_headers:
         logging.error(f"Skipping {target_site} due to failed header fetch.")
         return None, None, []
@@ -386,25 +394,99 @@ async def process_single_url_async(session, target_site, config, show_full_heade
 
     return score, grade, security_results + unwanted_results + upcoming_results
 
+# Function to determine the correct protocol (HTTP or HTTPS) for a URL
+async def determine_protocol(session, url, timeout=10):
+    parsed_url = urlparse(url)
+    if parsed_url.scheme:
+        return url  # URL already has a scheme, return as is
+
+    url = parsed_url.netloc or parsed_url.path  # Use netloc if available, otherwise path
+    
+    for scheme in ['https', 'http']:
+        try:
+            async with session.head(f'{scheme}://{url}', timeout=timeout, allow_redirects=True, ssl=False) as response:
+                logging.info(f"{scheme.upper()} connection successful for {url}")
+                return str(response.url)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logging.warning(f"{scheme.upper()} connection failed for {url}: {e}")
+    
+    logging.error(f"Both HTTPS and HTTP connections failed for {url}")
+    return None
+
 # Function to process multiple URLs from a text file and save to database (asynchronous)
-async def process_bulk_urls(urls_file, config, show_full_headers=False):
+async def process_bulk_urls(urls_file, config, show_full_headers=False, ssl_context=None):
     try:
         with open(urls_file, 'r') as file:
             urls = [url.strip() for url in file if url.strip()]
-        logging.info(f"Loaded {len(urls)} URLs from {urls_file}.")
     except FileNotFoundError:
         logging.error(f"URLs file {urls_file} not found.")
-        return
+        return None, []
 
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for url in urls:
-            tasks.append(process_single_url_async(session, url, config, show_full_headers))
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ssl=False),
+        timeout=timeout
+    ) as session:
+        tasks = [determine_protocol(session, url) for url in urls]
+        processed_urls = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        metrics = {
+            'total_urls': len(urls),
+            'successful_fetches': 0,
+            'unsuccessful_fetches': 0,
+            'http_urls': 0,
+            'https_urls': 0,
+            'unreachable_urls': 0
+        }
+        
+        valid_urls = []
+        for url in processed_urls:
+            if isinstance(url, str):
+                valid_urls.append(url)
+                if url.startswith('https://'):
+                    metrics['https_urls'] += 1
+                elif url.startswith('http://'):
+                    metrics['http_urls'] += 1
+            else:
+                metrics['unreachable_urls'] += 1
 
-        for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing URLs"):
-            await f
+        logging.info(f"Successfully processed {len(valid_urls)} out of {metrics['total_urls']} URLs from {urls_file}.")
 
-# Main function
+        tasks = [process_single_url_async(session, url, config, show_full_headers, ssl_context) for url in valid_urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        detailed_results = []
+        for url, result in zip(valid_urls, results):
+            if isinstance(result, Exception):
+                logging.error(f"Error processing {url}: {result}")
+                metrics['unsuccessful_fetches'] += 1
+            elif result[0] is not None:
+                score, grade, _ = result
+                print(f"URL: {url}, Score: {score}, Grade: {grade}")
+                detailed_results.append({'URL': url, 'Score': score, 'Grade': grade})
+                metrics['successful_fetches'] += 1
+            else:
+                logging.warning(f"No valid result for {url}")
+                metrics['unsuccessful_fetches'] += 1
+
+        # Print final metrics (for CLI output)
+        print("\nFinal Metrics:")
+        print(f"Total URLs processed: {metrics['total_urls']}")
+        print(f"Successful header fetches: {metrics['successful_fetches']}")
+        print(f"Unsuccessful header fetches: {metrics['unsuccessful_fetches']}")
+        print(f"Total HTTP URLs: {metrics['http_urls']}")
+        print(f"Total HTTPS URLs: {metrics['https_urls']}")
+        print(f"Unreachable URLs: {metrics['unreachable_urls']}")
+
+        if metrics['unreachable_urls'] > 0:
+            print("\nUnreachable URLs:")
+            for url, result in zip(urls, processed_urls):
+                if not isinstance(result, str):
+                    print(f"  - {url}")
+
+        return metrics, detailed_results
+
+# Modify the main function to return the results while still printing for CLI
 def main():
     init_db()  # Initialize the SQLite database
 
@@ -414,19 +496,36 @@ def main():
     parser.add_argument('--bulk', type=str, help='Path to a text file containing a list of URLs for bulk processing')
     parser.add_argument('--config', type=str, default=CONFIG_PATH_DEFAULT, help='Path to the headers configuration YAML file')
     parser.add_argument('--show_full_headers', action='store_true', help='Display full header values without truncation')
+    parser.add_argument('--disable-ssl-verify', action='store_true', help='Disable SSL certificate verification (use with caution, for testing only)')
     args = parser.parse_args()
 
     config = load_config(args.config)
 
+    if args.disable_ssl_verify:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        ssl_context = False
+        logging.warning("SSL verification is disabled. Use this option with caution and only for testing purposes.")
+    else:
+        ssl_context = None
+
+    # Always disable SSL verification for aiohttp
+    aiohttp.ClientSession.ssl = False
+
     if args.bulk:
-        # Run the asynchronous bulk processing
-        asyncio.run(process_bulk_urls(args.bulk, config, show_full_headers=args.show_full_headers))
+        # Run the asynchronous bulk processing and return the results
+        metrics, detailed_results = asyncio.run(process_bulk_urls(args.bulk, config, show_full_headers=args.show_full_headers, ssl_context=ssl_context))
+        return metrics, detailed_results
     elif args.target_site:
         # Process a single URL synchronously
-        process_single_url(args.target_site, config, show_full_headers=args.show_full_headers)
+        score, grade, results = process_single_url(args.target_site, config, show_full_headers=args.show_full_headers, ssl_context=ssl_context)
+        return {'score': score, 'grade': grade}, [{'URL': args.target_site, 'Score': score, 'Grade': grade}]
     else:
         parser.print_help()
         sys.exit(1)
 
 if __name__ == "__main__":
     main()
+else:
+    # This allows the script to be imported as a module without running main()
+    pass

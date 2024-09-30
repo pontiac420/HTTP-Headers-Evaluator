@@ -1,8 +1,10 @@
-aiohttp
-argparse
-beautifulsoup4
-colorama
+streamlit
+pandas
+plotly
 pyyaml
-requests
+colorama
 tabulate
 tqdm
+aiohttp
+beautifulsoup4
+requests

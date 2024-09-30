@@ -1,69 +1,73 @@
-# Web Security Header Analysis Tool
+# HTTP Header Security Scanner
 
-This repository contains a suite of tools for analyzing web security headers. It includes a command-line interface (CLI) tool for evaluating individual URLs or bulk URL lists, and an interactive menu-driven application for comprehensive analysis and reporting.
+## Overview
 
-## Files in the Repository
+The HTTP Header Security Scanner is a powerful tool designed to analyze and evaluate the security headers of websites. It provides both single URL and bulk URL scanning capabilities, along with an analytics dashboard for comprehensive security insights.
 
-### evaluator.py
+## Features
 
-This is the core CLI tool for evaluating web security headers. It can be used independently or called from the interactive menu.
+- **Single URL Scan**: Quickly analyze the security headers of a single website.
+- **Bulk URL Scan**: Process multiple URLs simultaneously for efficient large-scale analysis.
+- **Analytics Dashboard**: Visualize security trends, vulnerabilities, and adoption rates of security headers.
+- **Database Management**: View recent scans and perform database cleanup operations.
+- **Customizable Configuration**: Easily adjust security header requirements via a YAML configuration file.
 
-**Functionality:**
-- Evaluate security headers for a single URL
-- Process a list of URLs from a file
-- Generate detailed reports on header compliance and security scores
+## Installation and Usage
 
-**Usage:**
-```
-python3 evaluator.py --target_site <url>
-python3 evaluator.py --bulk <file_path>
-```
+### Prerequisites
 
-### interactive_menu.py
+- Docker
 
-This is the full suite application providing an interactive menu-driven interface for comprehensive header analysis.
+### Docker Deployment
 
-**Functionality:**
-1. Search results by grade
-2. List all results
-3. Show best and worst performing headers overall
-4. Show best and worst performing URLs
-5. Show the overall header health of a domain
-6. Run the Evaluator tool (calls evaluator.py)
-7. Exit the program
-
-**Usage:**
-```
-python3 interactive_menu.py
-```
-
-### results.db
-
-SQLite database file storing the results of header evaluations. This is used by both `evaluator.py` and `interactive_menu.py` to persist and retrieve analysis data.
-
-## Dependencies
-
-- Python 3.x
-- SQLite3
-- Additional Python libraries (specified in `requirements.txt`)
-
-## Setup and Installation
-
-1. Clone the repository
-2. Install required dependencies:
+1. Clone the repository:
    ```
-   pip install -r requirements.txt
+   git clone https://github.com/yourusername/http-header-security-scanner.git
+   cd http-header-security-scanner
    ```
-3. Ensure `evaluator.py` and `interactive_menu.py` are in the same directory
 
-## Usage
+2. Build the Docker image:
+   ```
+   docker build -t http-header-scanner .
+   ```
 
-- For quick evaluations of URLs, use `evaluator.py` directly.
-- For comprehensive analysis and reporting, run `interactive_menu.py` and use the menu options.
+3. Run the container:
+   ```
+   docker run -p 8501:8501 http-header-scanner
+   ```
 
-**Note:** Option 6 in the interactive menu (Run Evaluator) depends on `evaluator.py` being present in the same directory.
+4. Open your web browser and navigate to `http://localhost:8501` to access the application.
+
+### Using the Scanner
+
+1. **Single URL Scan**: 
+   - Enter a URL in the text input field.
+   - Click "Scan" to analyze the security headers.
+
+2. **Bulk URL Scan**:
+   - Upload a text file containing URLs or enter URLs manually (one per line).
+   - Click "Scan Bulk" to process multiple URLs.
+
+3. **Analytics Dashboard**:
+   - View overall security posture, trends, and vulnerabilities.
+   - Analyze security header adoption rates and recent changes.
+
+4. **Database Management**:
+   - View recent scans and perform database cleanup operations.
+
+## Configuration
+
+The `headers_config.yml` file in the Docker image contains the security header requirements and scoring criteria. To modify this, you'll need to update the file and rebuild the Docker image.
 
 ## Contributing
 
-Contributions to improve the tool are welcome. Please submit pull requests or open issues for any bugs or feature requests.
+Contributions to the HTTP Header Security Scanner are welcome! Please feel free to submit pull requests, create issues or spread the word.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- This project uses [Streamlit](https://streamlit.io/) for the web interface.
+- Security header recommendations are based on industry best practices and [OWASP](https://owasp.org/) guidelines.
