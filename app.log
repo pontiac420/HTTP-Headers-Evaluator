@@ -7938,3 +7938,8 @@
 2024-09-30 17:11:21,929 [INFO] Fetched security headers warnings for https://badger.schoox.com.
 2024-09-30 17:11:21,945 [INFO] Deleted entries older than 90 days for https://badger.schoox.com from the database.
 2024-09-30 17:11:21,948 [INFO] New results stored in database for https://badger.schoox.com.
+2024-10-01 12:52:55,770 [INFO] Configuration loaded from /Users/isk-sc-gr-ml7l/Github/HTTP-Header-Evaluator/Container/headers_config.yml.
+2024-10-01 12:52:56,383 [INFO] Fetched headers for https://app.schoox.com.
+2024-10-01 12:52:58,365 [INFO] Fetched security headers warnings for https://app.schoox.com.
+2024-10-01 12:52:58,393 [INFO] Deleted entries older than 90 days for https://app.schoox.com from the database.
+2024-10-01 12:52:58,416 [INFO] New results stored in database for https://app.schoox.com.

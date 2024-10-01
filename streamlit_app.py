@@ -120,6 +120,19 @@ elif page == "Analytics Dashboard":
                 st.text(result)
             else:
                 st.warning("Please enter a URL to analyze.")
+                
+        # New Search by Grade functionality
+        st.header("Search by Grade")
+        grade = st.selectbox("Select a grade:", 
+                             ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F"])
+        if st.button("Search by Grade"):
+            results = analytics.search_by_grade(grade)
+            if isinstance(results, list):
+                st.subheader(f"URLs with grade {grade}:")
+                for url in results:
+                    st.write(url)
+            else:
+                st.info(results)  # This will display the "No URLs found" message if applicable
 
     except Exception as e:
         st.error(f"An error occurred while generating analytics: {str(e)}")

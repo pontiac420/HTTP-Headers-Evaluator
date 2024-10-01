@@ -330,3 +330,30 @@ def find_subdomains_with_same_headers():
         result['Total Subdomains'] = result['Total Subdomains'].astype(str).str.center(5)
 
         return result
+
+def search_by_grade(grade):
+    with connect_to_db() as conn:
+        query = """
+        SELECT url, score, grade
+        FROM results
+        WHERE grade = ?
+        GROUP BY url
+        HAVING timestamp = MAX(timestamp)
+        ORDER BY score DESC
+        """
+        df = pd.read_sql_query(query, conn, params=(grade,))
+    
+    if df.empty:
+        return f"No URLs found with grade {grade}"
+    
+    # Format the results as a list of strings
+    results = []
+    for _, row in df.iterrows():
+        results.append(f"{row['url']} (Score: {row['score']:.2f})")
+    
+    return results
+
+# Example usage:
+# urls_with_grade_b = search_by_grade('B')
+# for url in urls_with_grade_b:
+#     print(url)
