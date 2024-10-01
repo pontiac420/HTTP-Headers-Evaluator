@@ -252,18 +252,9 @@ def check_unwanted_headers(headers, response_headers):
 
     return results, total_passes, total_fails
 
-# Function to handle upcoming headers (only mention them, no checks)
-def mention_upcoming_headers(upcoming_headers):
-    results = []
-    for header in upcoming_headers:
-        header_name = header['name']
-        results.append([header_name, "PASS (Upcoming header)", "N/A"])
-        print(f"{LIGHT_BLUE}{header_name}{NC}: {LIGHT_BLUE}PASS (Upcoming header){NC}")
-    return results
-
 # Function to calculate and display the final grade
 def calculate_final_grade(total_passes, total_fails):
-    score = (100 / 17) * (total_passes - total_fails)
+    score = 5 * (total_passes - total_fails)
 
     # Determine the grade based on the score
     if -100 <= score <= -88.89:
@@ -284,7 +275,7 @@ def calculate_final_grade(total_passes, total_fails):
         grade = "D"
     elif -11.12 < score <= -0.01:
         grade = "D+"
-    elif 0 < score <= 11.11:
+    elif -0.01 < score <= 11.11:
         grade = "C-"
     elif 11.11 < score <= 22.22:
         grade = "C"
@@ -329,20 +320,22 @@ def process_single_url(target_site, config, show_full_headers=False, ssl_context
     print_headers_list(response_headers, show_full=show_full_headers)
 
     # Check security headers
-    print("\nSecurity Headers (Fail if not present):")
+    print("\nSecurity Headers:")
     security_results, sec_pass, sec_fail = check_headers(config['headers'], warnings, response_headers, "security")
     total_passes += sec_pass
     total_fails += sec_fail
 
     # Check unwanted headers
-    print("\nHeaders That Should Be Removed (Fail if present):")
+    print("\nHeaders That Should Be Removed:")
     unwanted_results, unw_pass, unw_fail = check_unwanted_headers(config['unwanted_headers'], response_headers)
     total_passes += unw_pass
     total_fails += unw_fail
 
-    # Mention upcoming headers
+    # Check upcoming headers
     print("\nUpcoming Headers:")
-    upcoming_results = mention_upcoming_headers(config.get('upcoming_headers', []))
+    upcoming_results, up_pass, up_fail = check_headers(config.get('upcoming_headers', []), warnings, response_headers, "upcoming")
+    total_passes += up_pass
+    total_fails += up_fail
 
     # Calculate and print the final grade
     score, grade = calculate_final_grade(total_passes, total_fails)
@@ -371,20 +364,22 @@ async def process_single_url_async(session, target_site, config, show_full_heade
     print_headers_list(response_headers, show_full=show_full_headers)
 
     # Check security headers
-    print("\nSecurity Headers (Fail if not present):")
+    print("\nSecurity Headers:")
     security_results, sec_pass, sec_fail = check_headers(config['headers'], warnings, response_headers, "security")
     total_passes += sec_pass
     total_fails += sec_fail
 
     # Check unwanted headers
-    print("\nHeaders That Should Be Removed (Fail if present):")
+    print("\nHeaders That Should Be Removed:")
     unwanted_results, unw_pass, unw_fail = check_unwanted_headers(config['unwanted_headers'], response_headers)
     total_passes += unw_pass
     total_fails += unw_fail
 
-    # Mention upcoming headers
+    # Check upcoming headers
     print("\nUpcoming Headers:")
-    upcoming_results = mention_upcoming_headers(config.get('upcoming_headers', []))
+    upcoming_results, up_pass, up_fail = check_headers(config.get('upcoming_headers', []), warnings, response_headers, "upcoming")
+    total_passes += up_pass
+    total_fails += up_fail
 
     # Calculate final grade
     score, grade = calculate_final_grade(total_passes, total_fails)

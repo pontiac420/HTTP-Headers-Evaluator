@@ -10,13 +10,13 @@ import tempfile
 import os
 from reports import generate_report
 
-# Database operations
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+# Use the environment variable for SCRIPT_DIR
+SCRIPT_DIR = os.environ.get('SCRIPT_DIR', os.path.dirname(os.path.realpath(__file__)))
 DATABASE_PATH = os.path.join(SCRIPT_DIR, 'results.db')
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Run Scan", "Analytics Dashboard", "Database Management", "Generate Report"])
+page = st.sidebar.radio("Go to", ["Run Scan", "Search", "Analytics Dashboard", "Database Management", "Generate Report"])
 
 if page == "Run Scan":
     st.title("HTTP Header Security Scanner")
@@ -111,7 +111,15 @@ elif page == "Analytics Dashboard":
         else:
             st.info("No subdomains found with the same header configuration.")
 
-        # Move Search by URL functionality to the end
+    except Exception as e:
+        st.error(f"An error occurred while generating analytics: {str(e)}")
+
+elif page == "Search":
+    st.title("Search (Local Database)")
+
+    search_type = st.radio("Select search type", ["Search by URL", "Search by Grade"])
+
+    if search_type == "Search by URL":
         st.header("Search by URL")
         search_url = st.text_input("Enter a URL to analyze:")
         if st.button("Analyze"):
@@ -120,8 +128,8 @@ elif page == "Analytics Dashboard":
                 st.text(result)
             else:
                 st.warning("Please enter a URL to analyze.")
-                
-        # New Search by Grade functionality
+
+    elif search_type == "Search by Grade":
         st.header("Search by Grade")
         grade = st.selectbox("Select a grade:", 
                              ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F"])
@@ -133,9 +141,6 @@ elif page == "Analytics Dashboard":
                     st.write(url)
             else:
                 st.info(results)  # This will display the "No URLs found" message if applicable
-
-    except Exception as e:
-        st.error(f"An error occurred while generating analytics: {str(e)}")
 
 elif page == "Database Management":
     st.title("Database Management")
@@ -149,10 +154,27 @@ elif page == "Database Management":
             st.info("No recent scans found in the database.")
         
         st.header("Database Cleanup")
-        st.info("Note: The cleanup process automatically removes data older than 90 days. This helps maintain database performance and focuses on more recent scan results.")
+        
+        # Option to choose how many days old data should be deleted
+        days_to_keep = st.slider("Keep data from the last X days:", min_value=1, max_value=365, value=90)
+        st.info(f"Note: The cleanup process will remove data older than {days_to_keep} days. This helps maintain database performance and focuses on more recent scan results.")
         if st.button("Clean up old entries"):
-            deleted_count = analytics.cleanup_old_entries()
-            st.success(f"Cleaned up {deleted_count} entries older than 90 days from the database.")
+            deleted_count = analytics.cleanup_old_entries(days=days_to_keep)
+            st.success(f"Cleaned up {deleted_count} entries older than {days_to_keep} days from the database.")
+        
+        # Option to delete specific URLs
+        st.header("Delete Specific URLs")
+        url_to_delete = st.text_input("Enter the exact URL to delete:")
+        if st.button("Delete URL"):
+            if url_to_delete:
+                deleted_count = analytics.delete_url(url_to_delete)
+                if deleted_count > 0:
+                    st.success(f"Deleted {deleted_count} entries for URL: {url_to_delete}")
+                else:
+                    st.warning(f"No entries found for URL: {url_to_delete}")
+            else:
+                st.warning("Please enter a URL to delete.")
+        
     except Exception as e:
         st.error(f"An error occurred during database management: {str(e)}")
 

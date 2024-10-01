@@ -8,3 +8,4 @@ tqdm
 aiohttp
 beautifulsoup4
 requests
+matplotlib

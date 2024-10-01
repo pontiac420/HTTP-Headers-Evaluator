@@ -8,7 +8,7 @@ import os
 import hashlib
 
 # Database operations
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+SCRIPT_DIR = os.environ.get('SCRIPT_DIR', os.path.dirname(os.path.realpath(__file__)))
 DATABASE_PATH = os.path.join(SCRIPT_DIR, 'results.db')
 
 def connect_to_db():
@@ -17,13 +17,20 @@ def connect_to_db():
 def fetch_all_results_for_url(url):
     with connect_to_db() as conn:
         query = """
-        SELECT *
-        FROM results
-        WHERE url LIKE ? OR url LIKE ? OR url = ?
-        ORDER BY timestamp DESC
+        WITH latest_scan AS (
+            SELECT MAX(timestamp) as max_timestamp
+            FROM results
+            WHERE url LIKE ? OR url LIKE ? OR url = ?
+        )
+        SELECT r.*
+        FROM results r
+        JOIN latest_scan ls
+        WHERE (r.url LIKE ? OR r.url LIKE ? OR r.url = ?)
+        AND r.timestamp = ls.max_timestamp
         """
         # Prepend http:// and https:// to the search
-        return pd.read_sql_query(query, conn, params=(f"http://{url}%", f"https://{url}%", url))
+        params = (f"http://{url}%", f"https://{url}%", url) * 2
+        return pd.read_sql_query(query, conn, params=params)
 
 def fetch_recent_scans(limit=50):
     with connect_to_db() as conn:
@@ -94,15 +101,34 @@ def analyze_url(url):
     headers_report = generate_headers_report(df)
     vulnerability_summary = generate_vulnerability_summary(df)
 
-    return f"{summary}\n\n{interpretation}\n\n{headers_report}\n\n{vulnerability_summary}"
+    timestamp = df['timestamp'].iloc[0]
+    
+    return f"Most recent scan results (as of {timestamp}):\n\n{summary}\n\n{interpretation}\n\n{headers_report}\n\n{vulnerability_summary}"
 
 def generate_overall_summary():
     with connect_to_db() as conn:
         df = pd.read_sql_query("""
-            SELECT url, score, grade
-            FROM results
-            GROUP BY url
-            HAVING timestamp = MAX(timestamp)
+            WITH base_urls AS (
+                SELECT 
+                    CASE 
+                        WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                        WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                        ELSE url
+                    END AS base_url,
+                    url,
+                    timestamp,
+                    score,
+                    grade
+                FROM results
+            ),
+            latest_scans AS (
+                SELECT base_url, MAX(timestamp) as max_timestamp
+                FROM base_urls
+                GROUP BY base_url
+            )
+            SELECT DISTINCT bu.base_url, bu.url, bu.score, bu.grade
+            FROM base_urls bu
+            JOIN latest_scans ls ON bu.base_url = ls.base_url AND bu.timestamp = ls.max_timestamp
         """, conn)
     
     total_urls = len(df)
@@ -110,7 +136,7 @@ def generate_overall_summary():
     average_grade = calculate_grade(average_score)
     grade_distribution = df['grade'].value_counts().sort_index(ascending=False)
     
-    summary = f"Total URLs analyzed: {total_urls}\n"
+    summary = f"Total unique URLs analyzed: {total_urls}\n"
     summary += f"Average Security Score: {average_score:.2f}\n"
     summary += f"Average Grade: {average_grade}\n\n"
     
@@ -227,33 +253,100 @@ def header_adoption_rates():
 def recent_changes(days=30):
     with connect_to_db() as conn:
         df = pd.read_sql_query(f"""
-            SELECT r1.url, r1.score as new_score, r2.score as old_score,
-                   r1.grade as new_grade, r2.grade as old_grade
-            FROM results r1
-            JOIN results r2 ON r1.url = r2.url
-            WHERE r1.timestamp = (SELECT MAX(timestamp) FROM results WHERE url = r1.url)
-              AND r2.timestamp = (SELECT MAX(timestamp) FROM results WHERE url = r1.url AND timestamp < DATE('now', '-{days} days'))
-              AND (r1.score != r2.score OR r1.grade != r2.grade)
-            ORDER BY (r1.score - r2.score) DESC
+            WITH base_urls AS (
+                SELECT 
+                    CASE 
+                        WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                        WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                        ELSE url
+                    END AS base_url,
+                    url,
+                    timestamp,
+                    score,
+                    grade,
+                    ROW_NUMBER() OVER (PARTITION BY url ORDER BY timestamp DESC) as rn
+                FROM results
+                WHERE timestamp >= DATE('now', '-{days} days')
+            )
+            SELECT 
+                new.base_url,
+                new.url as new_url,
+                new.score as new_score,
+                new.grade as new_grade,
+                old.url as old_url,
+                old.score as old_score,
+                old.grade as old_grade
+            FROM base_urls new
+            LEFT JOIN base_urls old ON new.base_url = old.base_url AND old.rn = 2
+            WHERE new.rn = 1 AND (new.grade != old.grade OR old.grade IS NULL)
+            ORDER BY (new.score - COALESCE(old.score, new.score)) DESC
         """, conn)
     return df
 
-def cleanup_old_entries():
-    try:
-        conn = sqlite3.connect(DATABASE_PATH)
+def generate_overall_summary():
+    with connect_to_db() as conn:
+        df = pd.read_sql_query("""
+            WITH base_urls AS (
+                SELECT 
+                    CASE 
+                        WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                        WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                        ELSE url
+                    END AS base_url,
+                    url,
+                    timestamp,
+                    score,
+                    grade
+                FROM results
+            ),
+            latest_scans AS (
+                SELECT base_url, MAX(timestamp) as max_timestamp
+                FROM base_urls
+                GROUP BY base_url
+            )
+            SELECT DISTINCT bu.base_url, bu.url, bu.score, bu.grade
+            FROM base_urls bu
+            JOIN latest_scans ls ON bu.base_url = ls.base_url AND bu.timestamp = ls.max_timestamp
+        """, conn)
+    
+    total_urls = len(df)
+    average_score = df['score'].mean()
+    average_grade = calculate_grade(average_score)
+    grade_distribution = df['grade'].value_counts().sort_index(ascending=False)
+    
+    summary = f"Total unique URLs analyzed: {total_urls}\n"
+    summary += f"Average Security Score: {average_score:.2f}\n"
+    summary += f"Average Grade: {average_grade}\n\n"
+    
+    # Create a table for grade distribution
+    grade_table = []
+    for grade, count in grade_distribution.items():
+        percentage = (count / total_urls) * 100
+        # Pad the grade to align the letters
+        padded_grade = grade.rjust(2) if len(grade) == 1 else grade
+        grade_table.append([padded_grade, count, f"{percentage:.2f}%"])
+    
+    summary += "Grade Distribution:\n"
+    summary += tabulate(grade_table, headers=['Grade', 'Count', 'Percentage'], 
+                        tablefmt='pretty', colalign=('left', 'right', 'right'))
+    
+    return summary
+
+def cleanup_old_entries(days=90):
+    with connect_to_db() as conn:
         cursor = conn.cursor()
-
-        ninety_days_ago = (datetime.datetime.now() - datetime.timedelta(days=90)).isoformat()
-
-        cursor.execute('DELETE FROM results WHERE timestamp < ?', (ninety_days_ago,))
+        cursor.execute(f"DELETE FROM results WHERE timestamp < date('now', '-{days} days')")
         deleted_count = cursor.rowcount
-
         conn.commit()
-        conn.close()
+    return deleted_count
 
-        logging.info(f"Cleaned up {deleted_count} entries older than 90 days from the database.")
-    except sqlite3.Error as e:
-        logging.error(f"Database error during cleanup: {e}")
+def delete_url(url):
+    with connect_to_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM results WHERE url = ?", (url,))
+        deleted_count = cursor.rowcount
+        conn.commit()
+    return deleted_count
 
 # You can call this function periodically, e.g., once a day
 # cleanup_old_entries()
@@ -262,9 +355,29 @@ def find_subdomains_with_same_headers():
     with connect_to_db() as conn:
         # Query to get headers and their configurations for each subdomain
         query = """
-        SELECT url, header_name, header_value, grade
-        FROM results
-        WHERE url LIKE '%.%'  -- Ensure we are only looking at subdomains
+        WITH base_urls AS (
+            SELECT 
+                CASE 
+                    WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                    WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                    ELSE url
+                END AS base_url,
+                url,
+                timestamp,
+                header_name,
+                header_value,
+                grade
+            FROM results
+        ),
+        latest_scans AS (
+            SELECT base_url, MAX(timestamp) as max_timestamp
+            FROM base_urls
+            GROUP BY base_url
+        )
+        SELECT DISTINCT bu.base_url, bu.url, bu.header_name, bu.header_value, bu.grade
+        FROM base_urls bu
+        JOIN latest_scans ls ON bu.base_url = ls.base_url AND bu.timestamp = ls.max_timestamp
+        WHERE bu.url LIKE '%.%'  -- Ensure we are only looking at subdomains
         """
         df = pd.read_sql_query(query, conn)
 
