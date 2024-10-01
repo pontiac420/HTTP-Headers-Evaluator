@@ -1,5 +1,5 @@
 .DS_Store
-header_security_report.html
-results.db
-app.log
+Container/header_security_report.html
+Container/results.db
+Container/app.log
 .gitignore
