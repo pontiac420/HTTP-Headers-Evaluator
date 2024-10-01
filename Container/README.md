@@ -48,12 +48,18 @@ The HTTP Header Security Scanner is a powerful tool designed to analyze and eval
    - Upload a text file containing URLs or enter URLs manually (one per line).
    - Click "Scan Bulk" to process multiple URLs.
 
+3. **Retrieve URL data from database**:
+   - Use the search functionality to find and retrieve data for specific URLs.   
+
 3. **Analytics Dashboard**:
    - View overall security posture, trends, and vulnerabilities.
    - Analyze security header adoption rates and recent changes.
 
 4. **Database Management**:
    - View recent scans and perform database cleanup operations.
+
+5. **Generate Report**:
+   - Use the "Generate Report" button to create a detailed HTML report of the scan results.
 
 ## Configuration
 
