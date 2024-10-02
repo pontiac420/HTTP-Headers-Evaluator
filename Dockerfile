@@ -8,9 +8,7 @@ WORKDIR /app
 COPY Container /app
 
 # Install any needed packages
-RUN pip install --no-cache-dir streamlit pandas numpy
-
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Make port 8501 available to the world outside this container
 EXPOSE 8501
