@@ -253,58 +253,51 @@ def check_unwanted_headers(headers, response_headers):
     return results, total_passes, total_fails
 
 # Function to calculate and display the final grade
-def calculate_final_grade(total_passes, total_fails):
-    score = 5 * (total_passes - total_fails)
+def calculate_final_grade(total_passes, total_headers):
+    score = (total_passes / total_headers) * 100  # Calculate percentage
 
     # Determine the grade based on the score
-    if -100 <= score <= -88.89:
-        grade = "F-"
-    elif -88.89 < score <= -77.78:
+    if 0 <= score < 20:
         grade = "F"
-    elif -77.78 < score <= -66.67:
-        grade = "F+"
-    elif -66.67 < score <= -55.56:
-        grade = "E-"
-    elif -55.56 < score <= -44.45:
+    elif 20 <= score < 30:
         grade = "E"
-    elif -44.45 < score <= -33.34:
-        grade = "E+"
-    elif -33.34 < score <= -22.23:
+    elif 30 <= score < 40:
         grade = "D-"
-    elif -22.23 < score <= -11.12:
+    elif 40 <= score < 50:
         grade = "D"
-    elif -11.12 < score <= -0.01:
+    elif 50 <= score < 60:
         grade = "D+"
-    elif -0.01 < score <= 11.11:
+    elif 60 <= score < 65:
         grade = "C-"
-    elif 11.11 < score <= 22.22:
+    elif 65 <= score < 70:
         grade = "C"
-    elif 22.22 < score <= 33.33:
+    elif 70 <= score < 75:
         grade = "C+"
-    elif 33.33 < score <= 44.44:
+    elif 75 <= score < 80:
         grade = "B-"
-    elif 44.44 < score <= 55.55:
+    elif 80 <= score < 85:
         grade = "B"
-    elif 55.55 < score <= 66.66:
+    elif 85 <= score < 90:
         grade = "B+"
-    elif 66.66 < score <= 77.77:
+    elif 90 <= score < 95:
         grade = "A-"
-    elif 77.77 < score <= 88.88:
+    elif 95 <= score < 98:
         grade = "A"
-    elif 88.88 < score <= 100:
+    elif 98 <= score <= 100:
         grade = "A+"
     else:
         grade = "Not available"
 
-    print(f"\nFinal Score: {score:.2f}")
+    print(f"\nFinal Score: {score:.2f}%")
     print(f"Grade: {grade}")
 
     return score, grade
 
 # Function to process a single URL (synchronous)
 def process_single_url(target_site, config, show_full_headers=False, ssl_context=None):
+    # Initialize counters
+    total_headers = 0
     total_passes = 0
-    total_fails = 0
 
     # Fetch headers for the provided target site
     response_headers = fetch_headers_report_sync(target_site, ssl_context=ssl_context)
@@ -322,23 +315,23 @@ def process_single_url(target_site, config, show_full_headers=False, ssl_context
     # Check security headers
     print("\nSecurity Headers:")
     security_results, sec_pass, sec_fail = check_headers(config['headers'], warnings, response_headers, "security")
+    total_headers += len(config['headers'])
     total_passes += sec_pass
-    total_fails += sec_fail
 
     # Check unwanted headers
     print("\nHeaders That Should Be Removed:")
     unwanted_results, unw_pass, unw_fail = check_unwanted_headers(config['unwanted_headers'], response_headers)
+    total_headers += len(config['unwanted_headers'])
     total_passes += unw_pass
-    total_fails += unw_fail
 
     # Check upcoming headers
     print("\nUpcoming Headers:")
     upcoming_results, up_pass, up_fail = check_headers(config.get('upcoming_headers', []), warnings, response_headers, "upcoming")
+    total_headers += len(config.get('upcoming_headers', []))
     total_passes += up_pass
-    total_fails += up_fail
 
     # Calculate and print the final grade
-    score, grade = calculate_final_grade(total_passes, total_fails)
+    score, grade = calculate_final_grade(total_passes, total_headers)
 
     # Store results in the database
     store_results_in_db(target_site, score, grade, security_results + unwanted_results + upcoming_results)
@@ -347,8 +340,9 @@ def process_single_url(target_site, config, show_full_headers=False, ssl_context
 
 # Async function to process a single URL
 async def process_single_url_async(session, target_site, config, show_full_headers=False, ssl_context=None):
+    # Initialize counters
+    total_headers = 0
     total_passes = 0
-    total_fails = 0
 
     # Fetch headers
     response_headers = await fetch_headers_report_async(session, target_site, ssl_context=ssl_context)
@@ -366,23 +360,23 @@ async def process_single_url_async(session, target_site, config, show_full_heade
     # Check security headers
     print("\nSecurity Headers:")
     security_results, sec_pass, sec_fail = check_headers(config['headers'], warnings, response_headers, "security")
+    total_headers += len(config['headers'])
     total_passes += sec_pass
-    total_fails += sec_fail
 
     # Check unwanted headers
     print("\nHeaders That Should Be Removed:")
     unwanted_results, unw_pass, unw_fail = check_unwanted_headers(config['unwanted_headers'], response_headers)
+    total_headers += len(config['unwanted_headers'])
     total_passes += unw_pass
-    total_fails += unw_fail
 
     # Check upcoming headers
     print("\nUpcoming Headers:")
     upcoming_results, up_pass, up_fail = check_headers(config.get('upcoming_headers', []), warnings, response_headers, "upcoming")
+    total_headers += len(config.get('upcoming_headers', []))
     total_passes += up_pass
-    total_fails += up_fail
 
     # Calculate final grade
-    score, grade = calculate_final_grade(total_passes, total_fails)
+    score, grade = calculate_final_grade(total_passes, total_headers)
 
     # Store results in DB
     store_results_in_db(target_site, score, grade, security_results + unwanted_results + upcoming_results)

@@ -220,41 +220,33 @@ def generate_overall_summary():
     return summary
 
 def calculate_grade(score):
-    if -100 <= score <= -88.89:
-        return "F-"
-    elif -88.89 < score <= -77.78:
+    if 0 <= score < 20:
         return "F"
-    elif -77.78 < score <= -66.67:
-        return "F+"
-    elif -66.67 < score <= -55.56:
-        return "E-"
-    elif -55.56 < score <= -44.45:
+    elif 20 <= score < 30:
         return "E"
-    elif -44.45 < score <= -33.34:
-        return "E+"
-    elif -33.34 < score <= -22.23:
+    elif 30 <= score < 40:
         return "D-"
-    elif -22.23 < score <= -11.12:
+    elif 40 <= score < 50:
         return "D"
-    elif -11.12 < score <= -0.01:
+    elif 50 <= score < 60:
         return "D+"
-    elif 0 < score <= 11.11:
+    elif 60 <= score < 65:
         return "C-"
-    elif 11.11 < score <= 22.22:
+    elif 65 <= score < 70:
         return "C"
-    elif 22.22 < score <= 33.33:
+    elif 70 <= score < 75:
         return "C+"
-    elif 33.33 < score <= 44.44:
+    elif 75 <= score < 80:
         return "B-"
-    elif 44.44 < score <= 55.55:
+    elif 80 <= score < 85:
         return "B"
-    elif 55.55 < score <= 66.66:
+    elif 85 <= score < 90:
         return "B+"
-    elif 66.66 < score <= 77.77:
+    elif 90 <= score < 95:
         return "A-"
-    elif 77.77 < score <= 88.88:
+    elif 95 <= score < 98:
         return "A"
-    elif 88.88 < score <= 100:
+    elif 98 <= score <= 100:
         return "A+"
     else:
         return "Not available"
@@ -519,11 +511,24 @@ def find_subdomains_with_same_headers():
 def search_by_grade(grade):
     with connect_to_db() as conn:
         query = """
+        WITH latest_scans AS (
+            SELECT url, MAX(timestamp) as max_timestamp
+            FROM results
+            GROUP BY url
+        ),
+        ranked_results AS (
+            SELECT 
+                r.url, 
+                r.score, 
+                r.grade,
+                ROW_NUMBER() OVER (PARTITION BY r.url ORDER BY r.timestamp DESC) as rn
+            FROM results r
+            JOIN latest_scans ls ON r.url = ls.url AND r.timestamp = ls.max_timestamp
+            WHERE r.grade = ?
+        )
         SELECT url, score, grade
-        FROM results
-        WHERE grade = ?
-        GROUP BY url
-        HAVING timestamp = MAX(timestamp)
+        FROM ranked_results
+        WHERE rn = 1
         ORDER BY score DESC
         """
         df = pd.read_sql_query(query, conn, params=(grade,))
