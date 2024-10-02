@@ -37,7 +37,7 @@ if page == "Run Scan":
     disable_ssl_verify = st.checkbox("Disable SSL verification")
     
     if scan_type == "Single URL":
-        url = st.text_input("Enter URL to scan")
+        url = st.text_input("Enter URL to scan (e.g https://target_site.com)")
         if st.button("Scan", key="scan_single_url_button"):  # Unique key for this button
             try:
                 config = evaluator.load_config(evaluator.CONFIG_PATH_DEFAULT)
