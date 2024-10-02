@@ -36,12 +36,7 @@ The HTTP Header Security Scanner is a powerful tool designed to analyze and eval
    ```
 
 4. Open your web browser and navigate to `http://localhost:8501` to access the application.
-
-or pull docker image from docker hub
-
-```
-docker pull yashrajsingh/http-header-scanner:latest
-```
+   
 
 ### Using the Scanner
 
