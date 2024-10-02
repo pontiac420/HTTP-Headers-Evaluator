@@ -19,20 +19,24 @@ def connect_to_db():
 
 def fetch_all_results_for_url(url):
     with connect_to_db() as conn:
+        # Normalize the URL by removing the protocol if present
+        normalized_url = url.split('://')[-1] if '://' in url else url
+        
         query = """
         WITH latest_scan AS (
             SELECT MAX(timestamp) as max_timestamp
             FROM results
-            WHERE url LIKE ? OR url LIKE ? OR url = ?
+            WHERE url LIKE ? OR url LIKE ? OR url = ? OR url = ?
         )
         SELECT r.*
         FROM results r
         JOIN latest_scan ls
-        WHERE (r.url LIKE ? OR r.url LIKE ? OR r.url = ?)
+        WHERE (r.url LIKE ? OR r.url LIKE ? OR r.url = ? OR r.url = ?)
         AND r.timestamp = ls.max_timestamp
         """
-        # Prepend http:// and https:// to the search
-        params = (f"http://{url}%", f"https://{url}%", url) * 2
+        # Prepare search patterns for both http and https
+        params = (f"http://{normalized_url}%", f"https://{normalized_url}%", 
+                  f"http://{normalized_url}", f"https://{normalized_url}") * 2
         return pd.read_sql_query(query, conn, params=params)
 
 def fetch_recent_scans(limit=50):
