@@ -9,6 +9,7 @@ import asyncio
 import tempfile
 import os
 from reports import generate_report
+import plotly.graph_objects as go
 
 # Use the environment variable for SCRIPT_DIR
 SCRIPT_DIR = os.environ.get('SCRIPT_DIR', os.path.dirname(os.path.realpath(__file__)))
@@ -37,7 +38,7 @@ if page == "Run Scan":
     
     if scan_type == "Single URL":
         url = st.text_input("Enter URL to scan")
-        if st.button("Scan"):
+        if st.button("Scan", key="scan_single_url_button"):  # Unique key for this button
             try:
                 config = evaluator.load_config(evaluator.CONFIG_PATH_DEFAULT)
                 result = evaluator.process_single_url(url, config, show_full_headers=show_full_headers, ssl_context=None if disable_ssl_verify else False)
@@ -54,7 +55,7 @@ if page == "Run Scan":
     else:
         uploaded_file = st.file_uploader("Upload file with URLs", type="txt")
         bulk_urls = st.text_area("Or enter URLs (one per line)")
-        if st.button("Scan Bulk"):
+        if st.button("Scan Bulk", key="scan_bulk_urls_button"):  # Unique key for this button
             try:
                 config = evaluator.load_config(evaluator.CONFIG_PATH_DEFAULT)
                 
@@ -134,18 +135,23 @@ elif page == "Search":
     if search_type == "Search by URL":
         st.header("Search by URL")
         search_url = st.text_input("Enter a URL to analyze:")
-        if st.button("Analyze"):
-            if search_url:
-                result = analytics.analyze_url(search_url)
-                st.text(result)
+        if st.button("Analyze", key="search_analyze_url_button"):
+            result, recommendations_fig = analytics.analyze_url(search_url)
+            
+            # Display the text result
+            st.text(result)
+            
+            # Display the Plotly figure only if it exists
+            if recommendations_fig is not None:
+                st.plotly_chart(recommendations_fig)
             else:
-                st.warning("Please enter a URL to analyze.")
+                st.warning("No recommendations available. The database might be empty or the URL hasn't been scanned yet.")
 
     elif search_type == "Search by Grade":
         st.header("Search by Grade")
         grade = st.selectbox("Select a grade:", 
                              ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F"])
-        if st.button("Search by Grade"):
+        if st.button("Search by Grade", key="search_by_grade_button"):  # Add a unique key here
             results = analytics.search_by_grade(grade)
             if isinstance(results, list):
                 st.subheader(f"URLs with grade {grade}:")

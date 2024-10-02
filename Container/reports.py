@@ -134,7 +134,10 @@ def generate_comments_table():
         ("X-Permitted-Cross-Domain-Policies", "No", "Safe, controls cross-domain resource loading"),
         ("Clear-Site-Data", "Can cause data loss (e.g., cache, cookies)", "Needs to be used cautiously (e.g., for logout)"),
         ("Permissions-Policy", "Can interfere with feature access (e.g., geolocation)", "Safe if configured according to app requirements"),
-        ("Cache-Control", "No", "Safe, controls caching behavior")
+        ("Cache-Control", "No", "Safe, controls caching behavior"),
+        ("Cross-Origin-Embedder-Policy", "May break if not configured correctly", "Generally safe, controls embedding of resources"),
+        ("Cross-Origin-Opener-Policy", "May break if not configured correctly", "Generally safe, controls opener policy"),
+        ("Cross-Origin-Resource-Policy", "May break if not configured correctly", "Generally safe, controls resource policy")
     ]
     
     table_html = "<table><tr><th>Header</th><th>Can Break the App</th><th>Safe to Implement</th></tr>"

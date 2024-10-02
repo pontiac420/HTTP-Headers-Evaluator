@@ -1,11 +1,14 @@
 import sqlite3
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from tabulate import tabulate
 import datetime
 import logging
 import os
 import hashlib
+from reports import generate_configuration_proposal_table, generate_comments_table
+import textwrap
 
 # Database operations
 SCRIPT_DIR = os.environ.get('SCRIPT_DIR', os.path.dirname(os.path.realpath(__file__)))
@@ -84,26 +87,85 @@ def generate_vulnerability_summary(df):
     # Drop duplicate headers
     unique_vulnerabilities = vulnerabilities['header_name'].drop_duplicates()
     
-    summary = "Vulnerabilities (Missing or Failing Headers):\n"
+    summary = "Missing or Failing Headers:\n"
     for header in unique_vulnerabilities:
         summary += f"- {header}\n"
     
     return summary
 
+def generate_recommendations_table(vulnerability_summary):
+    # Helper function to parse HTML tables
+    def parse_html_table(html_table):
+        rows = html_table.split('<tr>')[2:]  # Skip header row
+        return [tuple(cell.split('</td>')[0].strip() for cell in row.split('<td>')[1:]) 
+                for row in rows if row.strip()]
+
+    # Parse the HTML tables
+    proposal_data = dict(parse_html_table(generate_configuration_proposal_table()))
+    comments_data = {row[0]: (row[1], row[2]) for row in parse_html_table(generate_comments_table())}
+    
+    headers = ['Header Name', 'Proposed Header Value', 'Can break the app', 'Safe to implement']
+    cells = []
+    
+    for header in vulnerability_summary.split('\n')[1:]:  # Skip the first line which is the title
+        header = header.strip('- ')  # Remove the leading dash and space
+        if header in proposal_data:
+            proposed_value = proposal_data[header]
+            can_break, safe_to_implement = comments_data.get(header, ("Unknown", "Unknown"))
+            cells.append([header, proposed_value, can_break, safe_to_implement])
+
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=headers,
+            fill_color='#4CAF50',  # A green color
+            align='left',
+            font=dict(color='white', size=12)
+        ),
+        cells=dict(
+            values=list(zip(*cells)),
+            fill_color='#F9F9F9',  # Very light gray, almost white
+            align='left',
+            font=dict(color='#333', size=11)  # Dark gray text
+        )
+    )])
+
+    fig.update_layout(
+        title='Recommendations',
+        height=100 + (len(cells) * 30),  # Adjust height based on number of rows
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor='white',  # White background for the entire figure
+        plot_bgcolor='white'    # White background for the plot area
+    )
+
+    return fig
+
 def analyze_url(url):
     df = fetch_all_results_for_url(url)
     
     if df.empty:
-        return f"No data found for URL: {url}"
+        return f"No data found for URL: {url}", None
 
     summary = generate_url_summary(df.iloc[0])
     interpretation = interpret_score_and_grade(df['score'].iloc[0], df['grade'].iloc[0])
     headers_report = generate_headers_report(df)
     vulnerability_summary = generate_vulnerability_summary(df)
+    recommendations_fig = generate_recommendations_table(vulnerability_summary)
 
     timestamp = df['timestamp'].iloc[0]
     
-    return f"Most recent scan results (as of {timestamp}):\n\n{summary}\n\n{interpretation}\n\n{headers_report}\n\n{vulnerability_summary}"
+    result = f"""Most recent scan results (as of {timestamp}):
+
+{summary}
+
+{interpretation}
+
+{headers_report}
+
+{vulnerability_summary}
+
+Recommendations:
+"""
+    return result, recommendations_fig
 
 def generate_overall_summary():
     with connect_to_db() as conn:
