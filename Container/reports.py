@@ -130,7 +130,7 @@ def generate_comments_table():
         ("X-Frame-Options", "Can block legitimate iframe usage", "Safe if your app doesn't use iframes"),
         ("X-Content-Type-Options", "No", "Safe for preventing MIME sniffing"),
         ("Referrer-Policy", "No", "Safe, controls how much referrer info is shared"),
-        ("Content-Security-Policy (CSP)", "Can block legitimate inline scripts or external content", "Requires careful configuration"),
+        ("Content-Security-Policy", "Can block legitimate inline scripts or external content", "Requires careful configuration"),
         ("X-Permitted-Cross-Domain-Policies", "No", "Safe, controls cross-domain resource loading"),
         ("Clear-Site-Data", "Can cause data loss (e.g., cache, cookies)", "Needs to be used cautiously (e.g., for logout)"),
         ("Permissions-Policy", "Can interfere with feature access (e.g., geolocation)", "Safe if configured according to app requirements"),
