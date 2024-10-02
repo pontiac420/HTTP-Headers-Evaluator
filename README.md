@@ -12,6 +12,17 @@ The HTTP Header Security Scanner is a powerful tool designed to analyze and eval
 - **Database Management**: View recent scans and perform database cleanup operations.
 - **Customizable Configuration**: Easily adjust security header requirements via a YAML configuration file.
 
+#### Navigation Menu:
+<img width="316" alt="εικόνα" src="https://github.com/user-attachments/assets/99e0d998-c5eb-45e0-962b-26957012d8f8">
+
+#### Single Scan:
+<img width="790" alt="εικόνα" src="https://github.com/user-attachments/assets/d66d28ff-aab6-4c16-ad4f-2cbedeba25c5">
+
+#### URL Analyze:
+<img width="781" alt="εικόνα" src="https://github.com/user-attachments/assets/f693548f-049f-406d-a6bf-671146409c55">
+
+
+
 ## Installation and Usage
 
 ### Prerequisites
