@@ -22,8 +22,7 @@ The HTTP Header Security Scanner is a powerful tool designed to analyze and eval
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/http-header-security-scanner.git
-   cd http-header-security-scanner
+   git clone https://github.com/pontiac420/HTTP-Headers-Scanner.git
    ```
 
 2. Build the Docker image:
