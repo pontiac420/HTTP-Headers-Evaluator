@@ -83,13 +83,21 @@ def generate_headers_report(df):
     return tabulate(headers_table, headers=['Header', 'Status', 'Value'], tablefmt='grid')
 
 def generate_vulnerability_summary(df):
-    vulnerabilities = df[df['status'] == 'FAIL']
+    # Filter for both 'FAIL' and 'FAIL (present)' statuses
+    vulnerabilities = df[df['status'].isin(['FAIL', 'FAIL (present)'])]
+    
     # Drop duplicate headers
     unique_vulnerabilities = vulnerabilities['header_name'].drop_duplicates()
     
     summary = "Missing or Failing Headers:\n"
     for header in unique_vulnerabilities:
-        summary += f"- {header}\n"
+        # Get the status for this header
+        status = vulnerabilities[vulnerabilities['header_name'] == header]['status'].iloc[0]
+        
+        if status == 'FAIL':
+            summary += f"- {header}\n"
+        elif status == 'FAIL (present)':
+            summary += f"- {header} (should be removed)\n"
     
     return summary
 
@@ -102,17 +110,37 @@ def generate_recommendations_table(vulnerability_summary):
 
     # Parse the HTML tables
     proposal_data = dict(parse_html_table(generate_configuration_proposal_table()))
-    comments_data = {row[0]: (row[1], row[2]) for row in parse_html_table(generate_comments_table())}
+    comments_data = {row[0].split(' ')[0]: (row[1], row[2]) for row in parse_html_table(generate_comments_table())}
     
-    headers = ['Header Name', 'Proposed Header Value', 'Can break the app', 'Safe to implement']
+    # List of headers that should be removed
+    headers_to_remove = [
+        "Server",
+        "X-Powered-By",
+        "X-AspNet-Version",
+        "X-AspNetMvc-Version",
+        "Feature-Policy",
+        "Public-Key-Pins",
+        "Expect-CT",
+        "X-XSS-Protection"
+        # Add any other headers that should be removed
+    ]
+    
+    headers = ['Header Name', 'Recommendation', 'Can break the app', 'Safe to implement']
     cells = []
     
     for header in vulnerability_summary.split('\n')[1:]:  # Skip the first line which is the title
         header = header.strip('- ')  # Remove the leading dash and space
-        if header in proposal_data:
-            proposed_value = proposal_data[header]
-            can_break, safe_to_implement = comments_data.get(header, ("Unknown", "Unknown"))
-            cells.append([header, proposed_value, can_break, safe_to_implement])
+        if header and not header.isspace():  # Check if header is not empty or just whitespace
+            if header.endswith(" (should be removed)"):
+                header = header.replace(" (should be removed)", "")
+                recommendation = "Remove header"
+            elif header in headers_to_remove:
+                recommendation = "Remove header"
+            else:
+                recommendation = proposal_data.get(header, "No specific recommendation")
+            
+            can_break, safe_to_implement = comments_data.get(header.split(' ')[0], ("Unknown", "Unknown"))
+            cells.append([header, recommendation, can_break, safe_to_implement])
 
     fig = go.Figure(data=[go.Table(
         header=dict(
