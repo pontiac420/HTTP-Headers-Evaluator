@@ -131,6 +131,9 @@ def generate_overall_summary():
             JOIN latest_scans ls ON bu.base_url = ls.base_url AND bu.timestamp = ls.max_timestamp
         """, conn)
     
+    if df.empty:
+        return "NO_DATA"
+    
     total_urls = len(df)
     average_score = df['score'].mean()
     average_grade = calculate_grade(average_score)
@@ -228,12 +231,68 @@ def top_vulnerabilities():
 def urls_requiring_attention():
     with connect_to_db() as conn:
         df = pd.read_sql_query("""
+            WITH base_urls AS (
+                SELECT 
+                    CASE 
+                        WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                        WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                        ELSE url
+                    END AS base_url,
+                    url,
+                    score,
+                    grade,
+                    ROW_NUMBER() OVER (PARTITION BY 
+                        CASE 
+                            WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
+                            WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
+                            ELSE url
+                        END 
+                    ORDER BY 
+                        CASE grade
+                            WHEN 'F' THEN 1
+                            WHEN 'F+' THEN 2
+                            WHEN 'F-' THEN 3
+                            WHEN 'D-' THEN 4
+                            WHEN 'D' THEN 5
+                            WHEN 'D+' THEN 6
+                            WHEN 'C-' THEN 7
+                            WHEN 'C' THEN 8
+                            WHEN 'C+' THEN 9
+                            WHEN 'B-' THEN 10
+                            WHEN 'B' THEN 11
+                            WHEN 'B+' THEN 12
+                            WHEN 'A-' THEN 13
+                            WHEN 'A' THEN 14
+                            WHEN 'A+' THEN 15
+                            ELSE 16
+                        END ASC,
+                        score ASC
+                    ) as row_num
+                FROM results
+            )
             SELECT url, score, grade
-            FROM results
-            WHERE grade IN ('F', 'D', 'C')
-            GROUP BY url
-            HAVING timestamp = MAX(timestamp)
-            ORDER BY score ASC
+            FROM base_urls
+            WHERE row_num = 1
+            ORDER BY 
+                CASE grade
+                    WHEN 'F' THEN 1
+                    WHEN 'F+' THEN 2
+                    WHEN 'F-' THEN 3
+                    WHEN 'D-' THEN 4
+                    WHEN 'D' THEN 5
+                    WHEN 'D+' THEN 6
+                    WHEN 'C-' THEN 7
+                    WHEN 'C' THEN 8
+                    WHEN 'C+' THEN 9
+                    WHEN 'B-' THEN 10
+                    WHEN 'B' THEN 11
+                    WHEN 'B+' THEN 12
+                    WHEN 'A-' THEN 13
+                    WHEN 'A' THEN 14
+                    WHEN 'A+' THEN 15
+                    ELSE 16
+                END ASC,
+                score ASC
             LIMIT 20
         """, conn)
     return df
@@ -282,55 +341,6 @@ def recent_changes(days=30):
             ORDER BY (new.score - COALESCE(old.score, new.score)) DESC
         """, conn)
     return df
-
-def generate_overall_summary():
-    with connect_to_db() as conn:
-        df = pd.read_sql_query("""
-            WITH base_urls AS (
-                SELECT 
-                    CASE 
-                        WHEN url LIKE 'http://%' THEN SUBSTR(url, 8)
-                        WHEN url LIKE 'https://%' THEN SUBSTR(url, 9)
-                        ELSE url
-                    END AS base_url,
-                    url,
-                    timestamp,
-                    score,
-                    grade
-                FROM results
-            ),
-            latest_scans AS (
-                SELECT base_url, MAX(timestamp) as max_timestamp
-                FROM base_urls
-                GROUP BY base_url
-            )
-            SELECT DISTINCT bu.base_url, bu.url, bu.score, bu.grade
-            FROM base_urls bu
-            JOIN latest_scans ls ON bu.base_url = ls.base_url AND bu.timestamp = ls.max_timestamp
-        """, conn)
-    
-    total_urls = len(df)
-    average_score = df['score'].mean()
-    average_grade = calculate_grade(average_score)
-    grade_distribution = df['grade'].value_counts().sort_index(ascending=False)
-    
-    summary = f"Total unique URLs analyzed: {total_urls}\n"
-    summary += f"Average Security Score: {average_score:.2f}\n"
-    summary += f"Average Grade: {average_grade}\n\n"
-    
-    # Create a table for grade distribution
-    grade_table = []
-    for grade, count in grade_distribution.items():
-        percentage = (count / total_urls) * 100
-        # Pad the grade to align the letters
-        padded_grade = grade.rjust(2) if len(grade) == 1 else grade
-        grade_table.append([padded_grade, count, f"{percentage:.2f}%"])
-    
-    summary += "Grade Distribution:\n"
-    summary += tabulate(grade_table, headers=['Grade', 'Count', 'Percentage'], 
-                        tablefmt='pretty', colalign=('left', 'right', 'right'))
-    
-    return summary
 
 def cleanup_old_entries(days=90):
     with connect_to_db() as conn:

@@ -86,37 +86,42 @@ elif page == "Analytics Dashboard":
     
     try:
         st.header("Overall Security Posture")
-        st.text(analytics.generate_overall_summary())
-        
-        st.header("Security Score Trend")
-        trend_data = analytics.analyze_trends()
-        fig = px.line(trend_data, x='date', y='avg_score', title='Average Security Score Over Time')
-        st.plotly_chart(fig)
-
-        st.header("Worst performing headers")
-        vuln_data = analytics.top_vulnerabilities()
-        fig = px.bar(vuln_data, x='header_name', y='count', title='Top 10 worst performing headers')
-        st.plotly_chart(fig)
-
-        st.header("URLs Requiring Immediate Attention")
-        attention_urls = analytics.urls_requiring_attention()
-        st.table(attention_urls)
-
-        st.header("Security Header Adoption Rates")
-        adoption_rates = analytics.header_adoption_rates()
-        fig = px.bar(adoption_rates, x='header_name', y='adoption_rate', title='Security Header Adoption Rates')
-        st.plotly_chart(fig)
-
-        st.header("Recent Changes (Last 30 Days)")
-        changes = analytics.recent_changes()
-        st.table(changes)
-
-        st.header("Subdomains with Same Header Configuration")
-        same_header_subdomains = analytics.find_subdomains_with_same_headers()
-        if not same_header_subdomains.empty:
-            st.table(same_header_subdomains)
+        summary = analytics.generate_overall_summary()
+        if summary == "NO_DATA":
+            st.info("No data available. Please run some scans to populate the database.")
         else:
-            st.info("No subdomains found with the same header configuration.")
+            st.text(summary)
+        
+        if summary != "NO_DATA":
+            st.header("Security Score Trend")
+            trend_data = analytics.analyze_trends()
+            fig = px.line(trend_data, x='date', y='avg_score', title='Average Security Score Over Time')
+            st.plotly_chart(fig)
+
+            st.header("Worst performing headers")
+            vuln_data = analytics.top_vulnerabilities()
+            fig = px.bar(vuln_data, x='header_name', y='count', title='Top 10 worst performing headers')
+            st.plotly_chart(fig)
+
+            st.header("URLs Requiring Immediate Attention")
+            attention_urls = analytics.urls_requiring_attention()
+            st.table(attention_urls)
+
+            st.header("Security Header Adoption Rates")
+            adoption_rates = analytics.header_adoption_rates()
+            fig = px.bar(adoption_rates, x='header_name', y='adoption_rate', title='Security Header Adoption Rates')
+            st.plotly_chart(fig)
+
+            st.header("Recent Changes (Last 30 Days)")
+            changes = analytics.recent_changes()
+            st.table(changes)
+
+            st.header("Subdomains with Same Header Configuration")
+            same_header_subdomains = analytics.find_subdomains_with_same_headers()
+            if not same_header_subdomains.empty:
+                st.table(same_header_subdomains)
+            else:
+                st.info("No subdomains found with the same header configuration.")
 
     except Exception as e:
         st.error(f"An error occurred while generating analytics: {str(e)}")
@@ -155,10 +160,10 @@ elif page == "Database Management":
     try:
         st.header("Recent Scans")
         recent_scans = analytics.fetch_recent_scans()
-        if not recent_scans.empty:
-            st.dataframe(recent_scans)
+        if recent_scans.empty:
+            st.info("No recent scans found in the database. Run some scans to populate the database.")
         else:
-            st.info("No recent scans found in the database.")
+            st.dataframe(recent_scans)
         
         st.header("Database Cleanup")
         
