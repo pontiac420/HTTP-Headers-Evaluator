@@ -101,6 +101,49 @@ def analyze_grades(df):
     
     return average_score, top_urls, critical_urls
 
+def generate_configuration_proposal_table():
+    proposal_data = [
+        ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
+        ("X-Frame-Options", "deny"),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Content-Security-Policy", "default-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests; block-all-mixed-content"),
+        ("X-Permitted-Cross-Domain-Policies", "none"),
+        ("Referrer-Policy", "no-referrer"),
+        ("Clear-Site-Data", "\"cache\",\"cookies\",\"storage\""),
+        ("Cross-Origin-Embedder-Policy", "require-corp"),
+        ("Cross-Origin-Opener-Policy", "same-origin"),
+        ("Cross-Origin-Resource-Policy", "same-origin"),
+        ("Permissions-Policy", "accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(), xr-spatial-tracking=(), clipboard-read=(), clipboard-write=(), gamepad=(), hid=(), idle-detection=(), interest-cohort=(), serial=(), unload=()"),
+        ("Cache-Control", "no-store, max-age=0")
+    ]
+    
+    table_html = "<table><tr><th>Header name</th><th>Proposed value</th></tr>"
+    for header, value in proposal_data:
+        table_html += f"<tr><td>{header}</td><td>{value}</td></tr>"
+    table_html += "</table>"
+    
+    return table_html
+
+def generate_comments_table():
+    comments_data = [
+        ("Strict-Transport-Security (HSTS)", "Can break non-HTTPS environments or development setups", "Safe in production with HTTPS"),
+        ("X-Frame-Options", "Can block legitimate iframe usage", "Safe if your app doesn't use iframes"),
+        ("X-Content-Type-Options", "No", "Safe for preventing MIME sniffing"),
+        ("Referrer-Policy", "No", "Safe, controls how much referrer info is shared"),
+        ("Content-Security-Policy (CSP)", "Can block legitimate inline scripts or external content", "Requires careful configuration"),
+        ("X-Permitted-Cross-Domain-Policies", "No", "Safe, controls cross-domain resource loading"),
+        ("Clear-Site-Data", "Can cause data loss (e.g., cache, cookies)", "Needs to be used cautiously (e.g., for logout)"),
+        ("Permissions-Policy", "Can interfere with feature access (e.g., geolocation)", "Safe if configured according to app requirements"),
+        ("Cache-Control", "No", "Safe, controls caching behavior")
+    ]
+    
+    table_html = "<table><tr><th>Header</th><th>Can Break the App</th><th>Safe to Implement</th></tr>"
+    for header, can_break, safe_to_implement in comments_data:
+        table_html += f"<tr><td>{header}</td><td>{can_break}</td><td>{safe_to_implement}</td></tr>"
+    table_html += "</table>"
+    
+    return table_html
+
 def generate_report(grade_filter=None):
     df = fetch_subdomain_data()
     
@@ -151,6 +194,12 @@ def generate_report(grade_filter=None):
         
         <h3>Critical URLs</h3>
         {{ critical_urls }}
+        
+        <h2>Configuration Proposal (Some headers might break the app)</h2>
+        {{ configuration_proposal }}
+        
+        <h2>Header Implementation Comments</h2>
+        {{ comments_table }}
     </body>
     </html>
     """
@@ -161,7 +210,9 @@ def generate_report(grade_filter=None):
         summary_table=summary_df.to_html(classes='table table-striped', index=False),
         grade_distribution=grade_distribution_img,
         top_urls=top_urls.to_html(classes='table table-striped', index=False),
-        critical_urls=critical_urls.to_html(classes='table table-striped', index=False)
+        critical_urls=critical_urls.to_html(classes='table table-striped', index=False),
+        configuration_proposal=generate_configuration_proposal_table(),
+        comments_table=generate_comments_table()
     )
 
     # Save the report
