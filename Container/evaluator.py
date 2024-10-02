@@ -124,8 +124,12 @@ def load_config(config_path):
 def fetch_headers_report_sync(target_site, ssl_context=None):
     try:
         with requests.Session() as session:
-            session.verify = False
-            response = session.head(target_site, allow_redirects=True, timeout=10)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = session.get(target_site, headers=headers, allow_redirects=True, timeout=10, stream=True)
+            # Using stream=True to avoid downloading the entire content
+            response.close()  # Close the connection immediately after getting headers
         logging.info(f"Fetched headers for {target_site}.")
         return response.headers
     except requests.exceptions.RequestException as e:
@@ -135,7 +139,12 @@ def fetch_headers_report_sync(target_site, ssl_context=None):
 # Async function to get the headers of a website
 async def fetch_headers_report_async(session, target_site, ssl_context=None):
     try:
-        async with session.head(target_site, allow_redirects=True, timeout=10, ssl=False) as response:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        async with session.get(target_site, headers=headers, allow_redirects=True, timeout=10, ssl=False) as response:
+            # Read only the headers, not the body
+            await response.start()
             headers = response.headers
             logging.info(f"Fetched headers for {target_site}.")
             return headers
