@@ -101,8 +101,19 @@ def analyze_grades(df):
     
     return average_score, top_urls, critical_urls
 
-def generate_report():
+def generate_report(grade_filter=None):
     df = fetch_subdomain_data()
+    
+    # Filter the dataframe based on the grade_filter
+    if grade_filter:
+        if isinstance(grade_filter, str):
+            df = df[df['grade'] == grade_filter]
+        elif isinstance(grade_filter, tuple) and len(grade_filter) == 2:
+            grade_order = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F']
+            start_index = grade_order.index(grade_filter[0])
+            end_index = grade_order.index(grade_filter[1])
+            selected_grades = grade_order[start_index:end_index+1]
+            df = df[df['grade'].isin(selected_grades)]
     
     # Create a summary table with unique URLs
     summary_df = df.drop_duplicates(subset=['url'])[['url', 'score', 'grade']]

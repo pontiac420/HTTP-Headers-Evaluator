@@ -192,11 +192,29 @@ elif page == "Database Management":
 
 elif page == "Generate Report":
     st.title("Generate Header Security Report")
-    st.write("Click the button below to generate a comprehensive Header Security Report.")
+    st.write("Select the options for your report:")
+
+    filter_type = st.selectbox("Filter type", ["No filter", "Specific grade", "Grade range", "Above grade", "Below grade"])
+
+    if filter_type == "Specific grade":
+        grade = st.selectbox("Select grade", ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'])
+        grade_filter = grade
+    elif filter_type == "Grade range":
+        start_grade = st.selectbox("Start grade", ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'])
+        end_grade = st.selectbox("End grade", ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'])
+        grade_filter = (start_grade, end_grade)
+    elif filter_type == "Above grade":
+        grade = st.selectbox("Select grade", ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'])
+        grade_filter = ('A+', grade)
+    elif filter_type == "Below grade":
+        grade = st.selectbox("Select grade", ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'])
+        grade_filter = (grade, 'F')
+    else:
+        grade_filter = None
 
     if st.button("Generate Report"):
         with st.spinner("Generating report..."):
-            report_file = generate_report()
+            report_file = generate_report(grade_filter)
         st.success(f"Report generated: {report_file}")
         
         with open(report_file, "rb") as file:
