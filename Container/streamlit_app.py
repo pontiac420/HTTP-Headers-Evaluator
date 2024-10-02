@@ -14,6 +14,13 @@ from reports import generate_report
 SCRIPT_DIR = os.environ.get('SCRIPT_DIR', os.path.dirname(os.path.realpath(__file__)))
 DATABASE_PATH = os.path.join(SCRIPT_DIR, 'results.db')
 
+# Initialize the database
+try:
+    evaluator.init_db()
+except Exception as e:
+    st.error(f"Failed to initialize database: {e}")
+    st.stop()
+
 # Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Run Scan", "Search", "Analytics Dashboard", "Database Management", "Generate Report"])
