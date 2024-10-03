@@ -1,0 +1,295 @@
+HTTP Header Security Analyzer 
+
+
+
+Configuration:
+header_info.json (list of headers with wanted value and recommendation)
+
+###############################################################################################
+
+
+
+Data Digestion:
+
+1. Fetching data:
+def clean_urls()
+This function take as input either a single url or a list of urls (one per line), or a text file (one per line)
+Cleans input, removes http/ https and path keeping only the raw url (e.g https://example.com becomes example.com, http://example.com/path becomes example.com etc.)
+Return the cleaned urls
+
+2. Scanner
+def fetch_headers()
+This function takes as input either a a single url or a list of urls (one per line), or a text file (one per line)
+Calls the clean_urls function to clean the urls
+Appends https to the url and makes a GET request using a normal user agent, follows redirects and returns the protocol, final url, status code, headers and timestamp
+If the url is not reachable, the function tries with http instead of https
+If the url is still not reachable, the function returns the original protocol as None, url, status code 0, empty headers and timestamp
+The results are stored in a database in the table "scanned_urls"
+Calls the tester function for each unique url successfully scanned, passes the final url and timestamp to the scorer function
+
+3. Tester
+This function loads the template from the file "owasp_headers_template.json":
+The json template is list with this format:
+[
+    {
+        "header": "header name",
+        "wanted": true/false,
+        "recommendation": "proposed value of the header"
+    }
+]
+Takes as input a single final url and the timestamp of the scan
+Searches the "scanned_urls" table for the final url and timestamp and retrieves the headers
+It then evaluates the headers using the json template:
+For each header in the template, the function checks if the header is present in the url's headers
+If the header is present and wanted is true, the header passes the test and is counted in the total passes
+If the header is present and wanted is false, the header fails the test and is counted in the total fails
+If the header is not present and wanted is true, the header fails the test and is counted in the total fails
+If the header is not present and wanted is false, the header passes the test and is counted in the total passes
+The results of the test are stored in a json object in the following format:
+{
+    "header name 1": "name of the header",
+    "test result": "pass/fail",
+    "header value": "value of the header",
+    "proposed value": "proposed value of the header"
+},
+{
+    "header name 2": "name of the header",
+    "test result": "pass/fail",
+    "header value": "value of the header",
+    "proposed value": "proposed value of the header"
+}
+Returns the total tested headers, the total passes and the total fails and timestamp as well as the detailed results (the json object with the results) for each final url
+The results are stored in a database in the table "tested_urls"
+Calls the scorer function to calculate the score, the grade and the detailed results for each url
+
+4. Scorer
+This function takes as input the total tested headers, the total passes and the total fails as well as the final url and the timestamp of the scan
+It calculates the score as the percentage of passes over the total tested headers ((total_passes / total_headers) * 100)
+It calculates the grade based on the score:
+ if 0 <= score < 20:
+        grade = "F"
+    elif 20 <= score < 30:
+        grade = "E"
+    elif 30 <= score < 40:
+        grade = "D-"
+    elif 40 <= score < 50:
+        grade = "D"
+    elif 50 <= score < 60:
+        grade = "D+"
+    elif 60 <= score < 65:
+        grade = "C-"
+    elif 65 <= score < 70:
+        grade = "C"
+    elif 70 <= score < 75:
+        grade = "C+"
+    elif 75 <= score < 80:
+        grade = "B-"
+    elif 80 <= score < 85:
+        grade = "B"
+    elif 85 <= score < 90:
+        grade = "B+"
+    elif 90 <= score < 95:
+        grade = "A-"
+    elif 95 <= score < 98:
+        grade = "A"
+    elif 98 <= score <= 100:
+        grade = "A+"
+    else:
+        grade = "Not available"
+It returns the score, the grade and the final url and the timestamp
+The results are stored in a database in the table "scored_urls"
+
+############################################################################################################
+
+
+
+
+Data analysis:
+
+1. Search by URL:
+Two options (single url or list of urls one per line/txt file with urls)
+Cleans the urls
+Retrieves the data from the "scanned_urls" table for the given url, returns the count of unique timestamps as the total number of scans against the specific url
+Retrieves the data from the "tested_urls" table for the given url, picks the latest timestamp and returns total tested, total passes, total fails and the detailed results of the test
+Retrieves the data from the "scored_urls" table for the given url, picks the latest timestamp and returns the score and the grade
+
+Expected output:
+
+##############################################################################
+
+URL: example.com
+Number of scans: 10
+
+Results of the latest scan:
+
+Total tested headers: 20
+Total passes: 15
+Total fails: 5
+
+Score: 75%
+Grade: B
+
+Detailed results:
+
+---------------------------------------------------------
+Header Name | Test Result | Header Value | Proposed Value 
+---------------------------------------------------------
+Header 1    | Pass        | Value 1      | Value 1        
+Header 2    | Fail        | Value 2      | Value 2        
+Header 3    | Pass        | Value 3      | Value 3
+Header 4    | Fail        | Value 4      | Value 4
+Header 5    | Pass        | Value 5      | Value 5
+Header 6    | Fail        | Value 6      | Value 6
+Header 7    | Pass        | Value 7      | Value 7
+----------------------------------------------------------
+
+2. Search by Grade:
+Choose single grade, or choose range of grades
+Retrieves the final urls, the score, the grade and the timestamp from the scored_urls table for the given grade or range of grades
+For each unique final url, retrieves the data from the tested_urls table, picks the latest timestamp and returns the total tested headers, total passes, total fails and the detailed results of the test
+
+Expected output (example for grade range D- to D+):
+
+##############################################################################
+
+List of URLs with grade range (D- to D+):
+
+example.com, score: 75%, grade: D
+example2.com, score: 80%, grade: D+
+example3.com, score: 60%, grade: D-
+
+3. Search by Header:
+Choose single header, or choose range of headers
+Retrieves all the rows with the headers chosen, for each header return the unique urls
+
+Expected output (example for header range X to Y):
+
+##############################################################################
+
+List of URLs with header "Referrer-Policy" present:
+
+example.com , "Referrer-Policy" : "no-referrer", proposed value: "no-referrer-when-downgrade"
+example2.com , "Referrer-Policy" : "no-referrer", proposed value: "no-referrer-when-downgrade"
+example3.com , "Referrer-Policy" : "no-referrer", proposed value: "no-referrer-when-downgrade"
+
+###############################################################################################
+
+
+
+
+Data visualization:
+
+1. Overal Summary:
+Total number of urls succesfully tested: 
+Overall Average Score:
+Overall Average Grade:
+
+
+
+2. Score distribution:
+
+
+
+3. Grade distribution:
+
+
+
+4. Header distribution:
+
+
+
+5. Trendlines
+
+
+
+6. Top URLs:
+
+
+
+7. Worst URLs:
+
+
+
+8. Recent changes:
+
+
+
+
+
+##############################################################################################
+
+
+
+
+Database Management:
+
+1. Delete records older than x days:
+
+
+
+2. Delete all records:
+
+
+
+3. Delete records by URL:
+
+
+
+4. Delete records by domain:
+
+
+
+5. Browse database:
+
+
+
+6. Export data:
+
+
+
+
+##############################################################################################
+
+
+
+
+Reporting:
+
+1. Generate report base on a few templates.
+
+
+
+
+##############################################################################################
+
+
+
+
+Mitigation Planner:
+
+1. If we add the Referrer-Policy header to everywhere its missing, what will be the overall improvement?
+2. If we add the X-Content-Type-Options and the X-Frame-Options headers to everywhere their missing, what will be the overall improvement?
+3. If we remove the X-Powered-By header from everywhere its present, what will be the overall improvement?
+4. Same for every type of combo of headers.
+5. The Strategist:
+Fetches header config for reference
+Supports these options (Number of headers to configure)
+1. Single header
+2. Two headers (Combo 1)
+3. Three headers (Combo 2)
+4. Four headers (Combo 3)
+...
+All headers (Combo N)
+
+Where "Combo 1" is add two headers, or remove one header
+"Combo 2" is add three headers, or remove two headers
+"Combo 3" is add four headers, or remove three headers
+...
+"Combo N" is add all headers, or remove all headers
+
+The user can choose and option ( 1, 2, 3 ... N)
+
+The Strategist then tries all the possible combinations and suggest the combinations that produced the best overall score improvement
+
+
+

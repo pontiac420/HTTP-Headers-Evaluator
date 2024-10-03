@@ -540,38 +540,44 @@ def find_subdomains_with_same_headers():
 
         return result
 
+from urllib.parse import urlparse
+
+def normalize_url(url):
+    parsed = urlparse(url)
+    normalized = parsed.netloc + parsed.path.rstrip('/')
+    return normalized.lower()
+
 def search_by_grade(grade):
     with connect_to_db() as conn:
+        # First, let's check if there are any results for this grade
+        check_query = "SELECT COUNT(*) as count FROM results WHERE grade = ?"
+        count = pd.read_sql_query(check_query, conn, params=(grade,))['count'].iloc[0]
+        
+        if count == 0:
+            print(f"Debug: No results found for grade {grade}")
+            return f"No URLs found with grade {grade}"
+        
+        # If we have results, let's fetch them all
         query = """
-        WITH latest_scans AS (
-            SELECT url, MAX(timestamp) as max_timestamp
-            FROM results
-            GROUP BY url
-        ),
-        ranked_results AS (
-            SELECT 
-                r.url, 
-                r.score, 
-                r.grade,
-                ROW_NUMBER() OVER (PARTITION BY r.url ORDER BY r.timestamp DESC) as rn
-            FROM results r
-            JOIN latest_scans ls ON r.url = ls.url AND r.timestamp = ls.max_timestamp
-            WHERE r.grade = ?
-        )
-        SELECT url, score, grade
-        FROM ranked_results
-        WHERE rn = 1
-        ORDER BY score DESC
+        SELECT url, grade, score, timestamp
+        FROM results
+        WHERE grade = ?
+        ORDER BY timestamp DESC
         """
         df = pd.read_sql_query(query, conn, params=(grade,))
     
-    if df.empty:
-        return f"No URLs found with grade {grade}"
+    print(f"Debug: Found {len(df)} results for grade {grade}")
     
-    # Format the results as a list of strings
-    results = []
-    for _, row in df.iterrows():
-        results.append(f"{row['url']} (Score: {row['score']:.2f})")
+    # Group by URL and keep only the most recent result for each
+    df = df.sort_values('timestamp', ascending=False).groupby('url').first().reset_index()
+    
+    print(f"Debug: After grouping, have {len(df)} unique URLs")
+    
+    # Format the results
+    results = [f"{row['url']} (Score: {row['score']:.2f}, Timestamp: {row['timestamp']})" for _, row in df.iterrows()]
+    
+    if not results:
+        return f"No URLs currently have grade {grade}"
     
     return results
 
